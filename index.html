@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat & File Sharing</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .container {
+            width: 50%;
+            margin: auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #chat-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+        #users-list {
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        #messages {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fff;
+            text-align: left;
+        }
+        input, button {
+            margin: 5px;
+            padding: 8px;
+        }
+        .message {
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .self {
+            background-color: #dcf8c6;
+            text-align: right;
+        }
+        .other {
+            background-color: #fff;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Chat & File Sharing</h2>
+        <input type="text" id="username" placeholder="Enter your name">
+        <button id="join">Join Chat</button>
+
+        <div id="chat-container">
+            <div id="users-list"></div>
+            <div id="messages"></div>
+            <input type="text" id="message" placeholder="Type a message...">
+            <button id="send">Send</button>
+            <input type="file" id="fileInput">
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let username = "";
+
+        document.getElementById("join").addEventListener("click", () => {
+            username = document.getElementById("username").value.trim();
+            if (username) {
+                socket.emit("new-user", username);
+                document.getElementById("chat-container").style.display = "flex";
+            }
+        });
+
+        socket.on("user-list", (users) => {
+            let userList = document.getElementById("users-list");
+            userList.innerHTML = "<h4>Online Users:</h4>";
+            for (let id in users) {
+                userList.innerHTML += `<p>${users[id]}</p>`;
+            }
+        });
+
+        document.getElementById("send").addEventListener("click", () => {
+            let message = document.getElementById("message").value.trim();
+            if (message) {
+                socket.emit("chat-message", { message });
+                appendMessage("You", message, true);
+                document.getElementById("message").value = "";
+            }
+        });
+
+        socket.on("receive-message", (data) => {
+            appendMessage(data.sender, data.message, false);
+        });
+
+        function appendMessage(sender, message, isSelf) {
+            let messagesDiv = document.getElementById("messages");
+            let msgElement = document.createElement("p");
+            msgElement.classList.add("message", isSelf ? "self" : "other");
+            msgElement.innerHTML = `<strong>${isSelf ? "You" : sender}:</strong> ${message}`;
+            messagesDiv.appendChild(msgElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        document.getElementById("fileInput").addEventListener("change", (event) => {
+            let file = event.target.files[0];
+            if (file) {
+                let reader = new FileReader();
+                reader.onload = () => {
+                    socket.emit("send-file", { fileName: file.name, fileUrl: reader.result });
+                    appendFile("You", file.name, reader.result, true);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        socket.on("receive-file", (data) => {
+            appendFile(data.sender, data.fileName, data.fileUrl, false);
+        });
+
+        function appendFile(sender, fileName, fileUrl, isSelf) {
+            let messagesDiv = document.getElementById("messages");
+            let fileElement = document.createElement("p");
+            fileElement.classList.add("message", isSelf ? "self" : "other");
+            fileElement.innerHTML = `<strong>${isSelf ? "You" : sender}:</strong> <a href="${fileUrl}" download="${fileName}">${fileName}</a>`;
+            messagesDiv.appendChild(fileElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html>
